@@ -6,15 +6,17 @@ import {
   CreateFileResponseDto,
   DeleteFileResponseDto,
   GetFileResponseDto,
+  GetFilesResponseDto,
 } from './dto/media.dto';
 import { GraphQLUpload, FileUpload } from 'graphql-upload';
+import { AuthGuard } from '@nestjs/passport';
 
 @Resolver()
 export class MediaResolver {
   constructor(private readonly mediaService: MediaService) {}
 
   @Mutation(() => CreateFileResponseDto)
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async uploadFile(
     @Args({ name: 'file', type: () => GraphQLUpload })
     file: FileUpload,
@@ -23,13 +25,13 @@ export class MediaResolver {
   }
   
   @Mutation(() => DeleteFileResponseDto)
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async deleteFile(@Args('key') key: string): Promise<DeleteFileResponseDto> {
     return this.mediaService.deleteFile(key);
   }
 
   @Query(() => GetFileResponseDto)
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async fileById(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<GetFileResponseDto> {
@@ -37,8 +39,14 @@ export class MediaResolver {
   }
 
   @Query(() => GetFileResponseDto)
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async fileByKey(@Args('key') key: string): Promise<GetFileResponseDto> {
     return this.mediaService.findByKey(key);
+  }
+
+  @Query(() => GetFilesResponseDto)
+  @UseGuards(JwtAuthGuard)
+  async files(): Promise<GetFilesResponseDto> {
+    return this.mediaService.findAll();
   }
 }

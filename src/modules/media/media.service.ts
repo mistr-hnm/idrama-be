@@ -20,6 +20,7 @@ import {
   DeleteFileResponseDto,
   MediaDto,
   GetFileResponseDto,
+  GetFilesResponseDto,
 } from './dto/media.dto';
 
 import { FileUpload } from 'graphql-upload';
@@ -179,6 +180,21 @@ export class MediaService {
       }
       console.error(`Find by key error for key ${key}:`, error);
       throw new InternalServerErrorException('Failed to fetch file');
+    }
+  }
+
+  async findAll(): Promise<GetFilesResponseDto> {
+    try {
+      const files = await this.mediaRepo.find()
+
+      return {
+        status: true,
+        message: 'Files fetched successfully',
+        data: files,
+      };
+    } catch (error) {
+      console.error(`Find all error:`, error);
+      throw new InternalServerErrorException('Failed to fetch files');
     }
   }
 

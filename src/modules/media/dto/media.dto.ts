@@ -47,3 +47,15 @@ export class DeleteFileResponseDto {
   @Field()
   message: string;
 }
+
+@ObjectType()
+export class GetFilesResponseDto {
+  @Field()
+  status: boolean;
+
+  @Field()
+  message: string;
+
+  @Field(() => [MediaDto])
+  data: MediaDto[];
+}

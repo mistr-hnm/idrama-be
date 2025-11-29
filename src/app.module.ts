@@ -33,6 +33,7 @@ import { GraphQLUpload } from 'graphql-upload';
         playground: false,
         uploads: false,
         resolvers: { Upload: GraphQLUpload },
+        context : ({req}) => ({req}),
         plugins: [
           process.env.NODE_ENV === 'production'
             ? ApolloServerPluginLandingPageProductionDefault({
