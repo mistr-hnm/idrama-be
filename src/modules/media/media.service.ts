@@ -51,65 +51,69 @@ export class MediaService {
 
   async uploadFile(file: FileUpload): Promise<CreateFileResponseDto> {
     try {
- 
-      const allowedExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
-      const lastDot = file.filename.lastIndexOf('.');
-      const ext = lastDot < 0 ? '' : file.filename.slice(lastDot).toLowerCase();
-
-      if (
-        !file.mimetype.startsWith('video/') &&
-        !allowedExtensions.includes(ext)
-      ) {
-        throw new BadRequestException(
-          'Only video files are allowed. Supported extensions: ' +
-            allowedExtensions.join(', '),
-        );
-      }
-
-      const originalFilename = file.filename;
-      const sanitizedFilenameWithExtension = originalFilename
-        .replace(/[^a-z0-9.-]/gi, '_')
-        .toLowerCase();
-      
-      const lastDotIndex = sanitizedFilenameWithExtension.lastIndexOf('.');
-      let filenameWithoutExtension = sanitizedFilenameWithExtension;
-      if (lastDotIndex > 0) { 
-          filenameWithoutExtension = sanitizedFilenameWithExtension.substring(0, lastDotIndex);
-      }
-
-      const fileKey = `${Date.now()}-${sanitizedFilenameWithExtension}`;
-      const uploadParams: any = {
-        Bucket: this.s3BucketName,
-        Key: fileKey,
-        Body: file.createReadStream(),
-        ContentType: file.mimetype,
-      };
-
-      const uploader = new Upload({
-        client: this.s3Client,
-        params: uploadParams,
-      });
-      await uploader.done();
-
-      const fileUrl = `https://${this.s3BucketName}.s3.${this.s3Region}.amazonaws.com/${fileKey}`; 
-      const newFile = this.mediaRepo.create({
-        filename: filenameWithoutExtension,
-        key: fileKey,
-        url: fileUrl,
-      });  
-      
-      const savedFile = await this.mediaRepo.save(newFile); 
-      if (!savedFile.id) {
-        throw new BadRequestException(`File upload failed.`);
-      }
+      const key = `videos/${Date.now()}-${file.filename}`; 
+        console.log('📤 Starting video upload...');
+        console.log('File size:', file.size || 'unknown');
+        console.log('File type:', file.mimetype);
+  
+        // Get file stream or buffer
+        const fileStream = file.createReadStream 
+          ? file.createReadStream() 
+          : Readable.from(file.buffer);
+  
+        // Use multipart upload for large files
+        const upload = new Upload({
+          client: this.s3Client,
+          params: {
+            Bucket: this.s3BucketName,
+            Key: key,
+            Body: fileStream,
+            ContentType: file.mimetype || 'video/mp4',
+            // Ensure proper caching
+            CacheControl: 'public, max-age=31536000',
+            // Add metadata
+            Metadata: {
+              originalName: file.filename,
+              uploadedAt: new Date().toISOString(),
+            },
+          },
+          // Enable multipart for files > 5MB
+          queueSize: 4,
+          partSize: 1024 * 1024 * 5, // 5MB parts
+        });
+  
+        // Monitor progress
+        upload.on('httpUploadProgress', (progress) => {
+          const percent = ((progress.loaded / progress.total) * 100).toFixed(2);
+          console.log(`Upload progress: ${percent}%`);
+        });
+  
+        const result = await upload.done();
+        
+        const url = `https://${this.s3BucketName}.s3.${this.s3Region}.amazonaws.com/${key}`;
+        
+        console.log('✅ Upload complete:', url);
+        console.log('ETag:', result.ETag);
+        
+        const newFile = this.mediaRepo.create({
+          filename: file.filename,
+          key: key,
+          url: url,
+        });  
+        
+        const savedFile = await this.mediaRepo.save(newFile); 
+        if (!savedFile.id) {
+          throw new BadRequestException(`File upload failed.`);
+        }
+  
 
       return {
         status: true,
         message: 'File uploaded successfully',
         data: {
-          key: fileKey,
-          url: fileUrl,
-          filename: filenameWithoutExtension,
+          key: key,
+          url: url,
+          filename: file.filename,
           id: savedFile.id,
         },
       };
@@ -118,6 +122,7 @@ export class MediaService {
       throw new InternalServerErrorException(error?.message ?? "Something went wrong");
     }
   }
+
  
   async deleteFile(key: string): Promise<DeleteFileResponseDto> {
     try {
@@ -186,7 +191,7 @@ export class MediaService {
   async findAll(): Promise<GetFilesResponseDto> {
     try {
       const files = await this.mediaRepo.find()
-
+      console.error(`Find all files:`, files);
       return {
         status: true,
         message: 'Files fetched successfully',
