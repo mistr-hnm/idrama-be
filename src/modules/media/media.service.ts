@@ -8,8 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Media } from './entities/media.entity';
-import { Upload } from '@aws-sdk/lib-storage';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Upload } from '@aws-sdk/lib-storage'; 
 import {
   S3Client,
   DeleteObjectCommand,
@@ -118,45 +117,7 @@ export class MediaService {
       throw new InternalServerErrorException(error?.message ?? "Something went wrong");
     }
   }
-
-  async getPresignedUrl(
-    key: string,
-    expiresInSeconds = 3600,
-  ): Promise<GetFileResponseDto> {
-    try {
-      const file = await this.mediaRepo.findOne({ where: { key } });
-
-      if (!file) {
-        throw new NotFoundException(`File not found.`);
-      }
-
-      const command = new GetObjectCommand({
-        Bucket: this.s3BucketName,
-        Key: key,
-      });
-
-      const presignedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: expiresInSeconds,
-      });
-
-      return {
-        status: true,
-        message: 'File fetched successfully',
-        data: {
-          key,
-          url: presignedUrl,
-          filename: file.filename,
-          id: file.id,
-        },
-      };
-    } catch (error) {
-      console.error('Presigned URL error:', error);
-      throw new InternalServerErrorException(
-        'Failed to generate secure file URL',
-      );
-    }
-  }
-
+ 
   async deleteFile(key: string): Promise<DeleteFileResponseDto> {
     try {
       const command = new DeleteObjectCommand({

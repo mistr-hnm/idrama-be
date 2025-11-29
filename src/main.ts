@@ -1,10 +1,24 @@
-// src/lambda.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { graphqlUploadExpress } from 'graphql-upload'
+import serverlessExpress from "@vendia/serverless-express";
+import { Callback, Context, Handler } from "aws-lambda";
+const express = require('express');
 import { ExpressAdapter } from '@nestjs/platform-express';
-import serverlessExpress from '@vendia/serverless-express';
-import { Handler, Context } from 'aws-lambda';
-import express from 'express';
+
+
+// let server: Handler;
+// async function bootstrap() {
+//   const app = await NestFactory.create(AppModule);
+//   app.enableCors()
+//   app.use(graphqlUploadExpress())
+//   await app.listen(process.env.PORT ?? 3000);
+
+
+// }
+// bootstrap();
+
+
 
 let cachedServer: Handler;
 
@@ -26,11 +40,7 @@ async function bootstrap(): Promise<Handler> {
 
       // Enable CORS
       app.enableCors();
-
-
-      // with server
-      // await app.listen(process.env.PORT ?? 3000);
-      
+      app.use(graphqlUploadExpress())
       // Initialize the app
       await app.init();
       
@@ -53,6 +63,7 @@ async function bootstrap(): Promise<Handler> {
 
   return cachedServer;
 }
+ 
 
 export const handler: Handler = async (event: any, context: Context) => {
   console.log('📨 Lambda invoked');

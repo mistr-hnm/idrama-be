@@ -21,16 +21,7 @@ export class MediaResolver {
   ): Promise<CreateFileResponseDto> {
     return this.mediaService.uploadFile(file);
   }
- 
-
-  @Query(() => GetFileResponseDto)
-  // @UseGuards(JwtAuthGuard)
-  async getPresignedUrl(
-    @Args('key') key: string,
-  ): Promise<GetFileResponseDto> {
-    return this.mediaService.getPresignedUrl(key);
-  }
-
+  
   @Mutation(() => DeleteFileResponseDto)
   // @UseGuards(JwtAuthGuard)
   async deleteFile(@Args('key') key: string): Promise<DeleteFileResponseDto> {
