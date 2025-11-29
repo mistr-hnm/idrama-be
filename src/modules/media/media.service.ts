@@ -17,13 +17,13 @@ import {
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import {
-  CreateFileResponseDto, 
+  CreateFileResponseDto,
   DeleteFileResponseDto,
   MediaDto,
   GetFileResponseDto,
 } from './dto/media.dto';
 
-import { FileUpload } from 'graphql-upload';   
+import { FileUpload } from 'graphql-upload';
 @Injectable()
 export class MediaService {
   private readonly s3Client: S3Client;
@@ -51,17 +51,38 @@ export class MediaService {
 
   async uploadFile(file: FileUpload): Promise<CreateFileResponseDto> {
     try {
-      const filename = file.filename
+ 
+      const allowedExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+      const lastDot = file.filename.lastIndexOf('.');
+      const ext = lastDot < 0 ? '' : file.filename.slice(lastDot).toLowerCase();
+
+      if (
+        !file.mimetype.startsWith('video/') &&
+        !allowedExtensions.includes(ext)
+      ) {
+        throw new BadRequestException(
+          'Only video files are allowed. Supported extensions: ' +
+            allowedExtensions.join(', '),
+        );
+      }
+
+      const originalFilename = file.filename;
+      const sanitizedFilenameWithExtension = originalFilename
         .replace(/[^a-z0-9.-]/gi, '_')
         .toLowerCase();
-      const fileKey = `${Date.now()}-${filename}`;
+      
+      const lastDotIndex = sanitizedFilenameWithExtension.lastIndexOf('.');
+      let filenameWithoutExtension = sanitizedFilenameWithExtension;
+      if (lastDotIndex > 0) { 
+          filenameWithoutExtension = sanitizedFilenameWithExtension.substring(0, lastDotIndex);
+      }
 
+      const fileKey = `${Date.now()}-${sanitizedFilenameWithExtension}`;
       const uploadParams: any = {
         Bucket: this.s3BucketName,
         Key: fileKey,
         Body: file.createReadStream(),
         ContentType: file.mimetype,
-        // ACL: isPublic ? 'public-read' : 'private',
       };
 
       const uploader = new Upload({
@@ -70,16 +91,14 @@ export class MediaService {
       });
       await uploader.done();
 
-
-      const fileUrl = `https://${this.s3BucketName}.s3.${this.s3Region}.amazonaws.com/${fileKey}`;
-
+      const fileUrl = `https://${this.s3BucketName}.s3.${this.s3Region}.amazonaws.com/${fileKey}`; 
       const newFile = this.mediaRepo.create({
-        filename,
+        filename: filenameWithoutExtension,
         key: fileKey,
         url: fileUrl,
-      });
-      const savedFile = await this.mediaRepo.save(newFile);
-
+      });  
+      
+      const savedFile = await this.mediaRepo.save(newFile); 
       if (!savedFile.id) {
         throw new BadRequestException(`File upload failed.`);
       }
@@ -90,40 +109,15 @@ export class MediaService {
         data: {
           key: fileKey,
           url: fileUrl,
-          filename,
+          filename: filenameWithoutExtension,
           id: savedFile.id,
         },
       };
     } catch (error) {
       console.error('S3 Upload error:', error);
-      throw new InternalServerErrorException('Failed to upload file to S3');
+      throw new InternalServerErrorException(error?.message ?? "Something went wrong");
     }
   }
- 
-  async AWSfileUpload(file: FileUpload) {
-    try {
-        // s3 functionality
-        const key = `fileLocationFolder/${Date.now()}-${file?.filename}`
-        const { createReadStream, mimetype} = file;
-
-        const fileStream = createReadStream()
-
-        const upload = new Upload({
-            client: this.s3Client,
-            params: {
-              Bucket: this.s3BucketName,
-              Key: key,
-              Body: fileStream,
-              ContentType: mimetype,
-            },
-          })
-
-        await upload.done()
-        return true
-    } catch (error) {
-        console.log('Error occurred on AWSfileUpload-files.service: ', error.message)
-    }
-}
 
   async getPresignedUrl(
     key: string,
@@ -183,12 +177,48 @@ export class MediaService {
     }
   }
 
-  async findById(id: string): Promise<MediaDto | null> {
-    return this.mediaRepo.findOne({ where: { id } });
+  async findById(id: string): Promise<GetFileResponseDto> {
+    try {
+      const file = await this.mediaRepo.findOne({ where: { id } });
+
+      if (!file) {
+        throw new NotFoundException(`File with id '${id}' not found.`);
+      }
+
+      return {
+        status: true,
+        message: 'File fetched successfully',
+        data: file,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error(`Find by id error for id ${id}:`, error);
+      throw new InternalServerErrorException('Failed to fetch file');
+    }
   }
 
-  async findByKey(key: string): Promise<MediaDto | null> {
-    return this.mediaRepo.findOne({ where: { key } });
+  async findByKey(key: string): Promise<GetFileResponseDto> {
+    try {
+      const file = await this.mediaRepo.findOne({ where: { key } });
+
+      if (!file) {
+        throw new NotFoundException(`File with key '${key}' not found.`);
+      }
+
+      return {
+        status: true,
+        message: 'File fetched successfully',
+        data: file,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error(`Find by key error for key ${key}:`, error);
+      throw new InternalServerErrorException('Failed to fetch file');
+    }
   }
 
   async getObjectBuffer(key: string): Promise<Buffer> {

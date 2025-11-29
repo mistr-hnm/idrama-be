@@ -13,6 +13,7 @@ const typeOrmConfig: TypeOrmModuleOptions = {
   database: process.env.DB_DATABASE,
   entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
   migrations: [path.join(__dirname, '../migration/**/*{.ts,.js}')],
+  ssl: { rejectUnauthorized: false },
   synchronize: false, // Never true for migrations in production
   autoLoadEntities: true, // This is specific to NestJS TypeOrmModule and can be included here
 };
