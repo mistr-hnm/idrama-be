@@ -41,6 +41,7 @@ import { GraphQLUpload } from 'graphql-upload';
               })
             : ApolloServerPluginLandingPageLocalDefault({ footer: false }),
         ],
+        path : '/graphql',
         autoSchemaFile: true,
         formatError: (error: GraphQLError) => {
           const formattedError: GraphQLFormattedError = {
